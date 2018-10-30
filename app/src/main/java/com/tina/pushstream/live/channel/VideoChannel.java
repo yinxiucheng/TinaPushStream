@@ -61,7 +61,7 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
     public void onChanged(int w, int h) {
         Log.e(TAG, "setPreviewCallback  data onChanged");
         //初始化编码器
-//        mLivePusher.native_setVideoEncInfo(w, h, mFps, mBitrate);
+        mLivePusher.native_setVideoEncInfo(w, h, mFps, mBitrate);
     }
 
     public void startLive() {
