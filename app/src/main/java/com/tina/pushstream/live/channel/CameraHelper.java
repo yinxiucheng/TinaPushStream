@@ -54,6 +54,7 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
     }
 
     private void startPreview() {
+        Log.e(TAG, "startPreview");
         try {
             //获得camera对象
             mCamera = Camera.open(mCameraId);
@@ -80,6 +81,7 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
     }
 
     private void setPreviewOrientation(Camera.Parameters parameters) {
+        Log.e(TAG, "setPreviewOrientation");
         Camera.CameraInfo info = new Camera.CameraInfo();
         Camera.getCameraInfo(mCameraId, info);
         mRotation = mActivity.getWindowManager().getDefaultDisplay().getRotation();
@@ -148,25 +150,28 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-
+        Log.e(TAG, "surfaceCreated");
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
         //释放摄像头
         stopPreview();
+        Log.e(TAG, "surfaceChanged");
         //开启摄像头
         startPreview();
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.e(TAG, "surfaceDestroyed");
         stopPreview();
     }
 
 
     @Override
     public void onPreviewFrame(byte[] data, Camera camera) {
+//        Log.e(TAG, "onPreviewFrame");
         // data数据依然是倒的
         mPreviewCallback.onPreviewFrame(data, camera);
         camera.addCallbackBuffer(buffer);

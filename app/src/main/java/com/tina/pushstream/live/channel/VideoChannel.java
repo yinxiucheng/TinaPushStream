@@ -2,6 +2,7 @@ package com.tina.pushstream.live.channel;
 
 import android.app.Activity;
 import android.hardware.Camera;
+import android.util.Log;
 import android.view.SurfaceHolder;
 
 import com.tina.pushstream.live.LivePusher;
@@ -9,7 +10,7 @@ import com.tina.pushstream.live.LivePusher;
 
 public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChangedSizeListener {
 
-
+    private static final String TAG = "CameraHelper";
     private LivePusher mLivePusher;
     private CameraHelper cameraHelper;
     private int mBitrate;
@@ -21,6 +22,8 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
         mBitrate = bitrate;
         mFps = fps;
         cameraHelper = new CameraHelper(activity, cameraId, width, height);
+
+        Log.e(TAG, "setPreviewCallback");
         //1、让camerahelper的
         cameraHelper.setPreviewCallback(this);
         //2、回调 真实的摄像头数据宽、高
@@ -56,6 +59,7 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
      */
     @Override
     public void onChanged(int w, int h) {
+        Log.e(TAG, "setPreviewCallback  data onChanged");
         //初始化编码器
 //        mLivePusher.native_setVideoEncInfo(w, h, mFps, mBitrate);
     }
