@@ -57,7 +57,7 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
     @Override
     public void onChanged(int w, int h) {
         //初始化编码器
-        mLivePusher.native_setVideoEncInfo(w, h, mFps, mBitrate);
+//        mLivePusher.native_setVideoEncInfo(w, h, mFps, mBitrate);
     }
 
     public void startLive() {
