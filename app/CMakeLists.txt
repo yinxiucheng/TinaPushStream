@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.4.1)
 # 引入指定目录下的CMakeLists.txt
 add_subdirectory(src/main/cpp/librtmp)
 
+include_directories(src/main/cpp/include)
+
 add_library( # Sets the name of the library.
              native-lib
 
@@ -10,8 +12,11 @@ add_library( # Sets the name of the library.
 
              src/main/cpp/native-lib.cpp )
 
+#在libs下加入了包，所以指定CMAKE_CXX_FLAGS
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L${CMAKE_SOURCE_DIR}/src/main/cpp/libs/${ANDROID_ABI}")
 
 target_link_libraries(
                        native-lib
                        rtmp
+                       x264
                        log)
