@@ -23,6 +23,7 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
     private Camera.PreviewCallback mPreviewCallback;
     private int mRotation;
     private OnChangedSizeListener mOnChangedSizeListener;
+    byte[] bytes;
 
     public CameraHelper(Activity activity, int cameraId, int width, int height) {
         mActivity = activity;
@@ -54,7 +55,6 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
     }
 
     private void startPreview() {
-        Log.e(TAG, "startPreview");
         try {
             //获得camera对象
             mCamera = Camera.open(mCameraId);
@@ -68,12 +68,12 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
             setPreviewOrientation(parameters);
             mCamera.setParameters(parameters);
             buffer = new byte[mWidth * mHeight * 3 / 2];
+            bytes = new byte[buffer.length];
             //数据缓存区
             mCamera.addCallbackBuffer(buffer);
             mCamera.setPreviewCallbackWithBuffer(this);
             //设置预览画面
             mCamera.setPreviewDisplay(mSurfaceHolder);
-            mOnChangedSizeListener.onChanged(mWidth, mHeight);
             mCamera.startPreview();
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -89,15 +89,15 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
         switch (mRotation) {
             case Surface.ROTATION_0:
                 degrees = 0;
+                mOnChangedSizeListener.onChanged(mHeight, mWidth);
                 break;
             case Surface.ROTATION_90: // 横屏 左边是头部(home键在右边)
                 degrees = 90;
-                break;
-            case Surface.ROTATION_180:
-                degrees = 180;
+                mOnChangedSizeListener.onChanged(mWidth, mHeight);
                 break;
             case Surface.ROTATION_270:// 横屏 头部在右边
                 degrees = 270;
+                mOnChangedSizeListener.onChanged(mWidth, mHeight);
                 break;
         }
         int result;
@@ -171,16 +171,72 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
 
     @Override
     public void onPreviewFrame(byte[] data, Camera camera) {
-//        Log.e(TAG, "onPreviewFrame");
+        switch (mRotation) {
+            case Surface.ROTATION_0:
+                rotation90(data);
+                break;
+            case Surface.ROTATION_90: // 横屏 左边是头部(home键在右边)
+                break;
+            case Surface.ROTATION_270:// 横屏 头部在右边
+                break;
+        }
         // data数据依然是倒的
-        mPreviewCallback.onPreviewFrame(data, camera);
+        mPreviewCallback.onPreviewFrame(bytes, camera);
         camera.addCallbackBuffer(buffer);
     }
 
+    private void rotation90(byte[] data) {
+        int index = 0;
+        int ySize = mWidth * mHeight;
+        //u和v
+        int uvHeight = mHeight / 2;
+        //后置摄像头顺时针旋转90度
+        if (mCameraId == Camera.CameraInfo.CAMERA_FACING_BACK) {
+            //将y的数据旋转之后 放入新的byte数组
+            for (int i = 0; i < mWidth; i++) {
+                for (int j = mHeight - 1; j >= 0; j--) {
+                    bytes[index++] = data[mWidth * j + i];
+                }
+            }
+
+            //每次处理两个数据
+            for (int i = 0; i < mWidth; i += 2) {
+                for (int j = uvHeight - 1; j >= 0; j--) {
+                    // v
+                    bytes[index++] = data[ySize + mWidth * j + i];
+                    // u
+                    bytes[index++] = data[ySize + mWidth * j + i + 1];
+                }
+            }
+        } else {
+            //逆时针旋转90度
+            for (int i = 0; i < mWidth; i++) {
+                int nPos = mWidth - 1;
+                for (int j = 0; j < mHeight; j++) {
+                    bytes[index++] = data[nPos - i];
+                    nPos += mWidth;
+                }
+            }
+            //u v
+            for (int i = 0; i < mWidth; i += 2) {
+                int nPos = ySize + mWidth - 1;
+                for (int j = 0; j < uvHeight; j++) {
+                    bytes[index++] = data[nPos - i - 1];
+                    bytes[index++] = data[nPos - i];
+                    nPos += mWidth;
+                }
+            }
+        }
+    }
 
 
     public void setOnChangedSizeListener(OnChangedSizeListener listener) {
         mOnChangedSizeListener = listener;
+    }
+
+    public void release() {
+        mSurfaceHolder.removeCallback(this);
+        stopPreview();
     }
 
     public interface OnChangedSizeListener {
