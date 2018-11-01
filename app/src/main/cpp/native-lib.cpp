@@ -5,7 +5,7 @@
 #include "macro.h"
 #include "safe_queue.h"
 #include "VideoChannel.h"
-
+#include "AudioChannel.h"
 
 SafeQueue<RTMPPacket *> packets;
 
@@ -15,6 +15,9 @@ int readyPushing = 0;
 
 int isStart = 0;
 pthread_t pid;
+
+
+AudioChannel *audioChannel = 0;
 
 void releasePackets(RTMPPacket *&packet) {
     if (packet) {
@@ -40,6 +43,8 @@ Java_com_tina_pushstream_live_LivePusher_native_1init(JNIEnv *env, jobject insta
     //准备一个Video编码器的工具类 ：进行编码
     videoChannel = new VideoChannel;
     videoChannel->setVideoCallback(callback);
+    audioChannel = new AudioChannel;
+    audioChannel->setAudioCallback(callback);
     //准备一个队列,打包好的数据 放入队列，在线程中统一的取出数据再发送给服务器
     packets.setReleaseCallback(releasePackets);
 }
@@ -86,17 +91,19 @@ void *start(void *args) {
             LOGE("rtmp连接流失败:%s", url);
             break;
         }
-
-        //准备好了 可以开始推流了
-        readyPushing = 1;
         //记录一个开始推流的时间
         start_time = RTMP_GetTime();
+        //准备好了 可以开始推流了
+        readyPushing = 1;
+
         packets.setWork(1);
+        //保证第一个数据是 aac解码数据包
+        callback(audioChannel->getAudioTag());
         RTMPPacket *packet = 0;
         //循环从队列取包 然后发送
-        while (isStart) {
+        while(readyPushing) {
             packets.pop(packet);
-            if (!isStart) {
+            if (!readyPushing) {
                 break;
             }
             if (!packet) {
@@ -104,7 +111,11 @@ void *start(void *args) {
             }
             // 给rtmp的流id
             packet->m_nInfoField2 = rtmp->m_stream_id;
-            //发送包 1:加入队列发送
+            //发送rtmp包 1：队列
+            // 意外断网？发送失败，rtmpdump 内部会调用RTMP_Close
+            // RTMP_Close 又会调用 RTMP_SendPacket
+            // RTMP_SendPacket  又会调用 RTMP_Close
+            // 将rtmp.c 里面WriteN方法的 Rtmp_Close注释掉
             ret = RTMP_SendPacket(rtmp, packet, 1);
             releasePackets(packet);
             if (!ret) {
@@ -114,6 +125,10 @@ void *start(void *args) {
         }
         releasePackets(packet);
     } while (0);
+    isStart = 0;
+    readyPushing = 0;
+    packets.setWork(0);
+    packets.clear();
     if (rtmp) {
         RTMP_Close(rtmp);
         RTMP_Free(rtmp);
@@ -129,13 +144,12 @@ Java_com_tina_pushstream_live_LivePusher_native_1start(JNIEnv *env, jobject inst
     if (isStart) {
         return;
     }
+    isStart = 1;
     const char *path = env->GetStringUTFChars(path_, 0);
     char *url = new char[strlen(path) + 1];
     strcpy(url, path);
-    isStart = 1;
     //启动线程
     pthread_create(&pid, 0, start, url);
-
     env->ReleaseStringUTFChars(path_, path);
 }
 
@@ -151,5 +165,56 @@ Java_com_tina_pushstream_live_LivePusher_native_1pushVideo(JNIEnv *env, jobject 
 
     videoChannel->encodeData(data);
 
+    env->ReleaseByteArrayElements(data_, data, 0);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tina_pushstream_live_LivePusher_native_1stop(JNIEnv *env, jobject instance) {
+    readyPushing = 0;
+    //关闭队列工作
+    packets.setWork(0);
+    pthread_join(pid, 0);
+}
+
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tina_pushstream_live_LivePusher_native_1release(JNIEnv *env, jobject instance) {
+    DELETE(videoChannel);
+    DELETE(audioChannel);
+}
+
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tina_pushstream_live_LivePusher_native_1setAudioEncInfo(JNIEnv *env, jobject instance,
+                                                                 jint sampleRateInHz,
+                                                                 jint channels) {
+    if (audioChannel) {
+        audioChannel->setAudioEncInfo(sampleRateInHz, channels);
+    }
+
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_tina_pushstream_live_LivePusher_getInputSamples(JNIEnv *env, jobject instance) {
+
+    if (audioChannel) {
+        return audioChannel->getInputSamples();
+    }
+    return -1;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_tina_pushstream_live_LivePusher_native_1pushAudio(JNIEnv *env, jobject instance,
+                                                           jbyteArray data_) {
+    if (!audioChannel || !readyPushing) {
+        return;
+    }
+    jbyte *data = env->GetByteArrayElements(data_, NULL);
+    audioChannel->encodeData(data);
     env->ReleaseByteArrayElements(data_, data, 0);
 }

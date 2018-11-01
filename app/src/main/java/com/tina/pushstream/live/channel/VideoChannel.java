@@ -71,4 +71,10 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
     public void stopLive() {
         isLiving = false;
     }
+
+
+    public void release() {
+        cameraHelper.release();
+    }
+
 }
